@@ -10,6 +10,8 @@ namespace ChatApplication
     {
         static void Main(string[] args)
         {
+            var chatServer = new ChatServer();
+            Task.Run(() => chatServer.StartServer(13000));
         }
     }
 }
