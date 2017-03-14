@@ -14,11 +14,30 @@ namespace ChatApplication
     {
         private Dictionary<string, ChatConnection> ClientRegistry { get; set; } // Use concurrentDictionary instead?
 
+        private readonly object locker = new object();
+
+        private bool isShuttingDown;
+
+        public bool IsShuttingDown
+        {
+            get { lock (locker) { return isShuttingDown; } }
+            set { lock (locker) { isShuttingDown = value; } }
+        }
+
+        private List<string> messages;
+
+        public List<string> Messages
+        {
+            get { lock (locker) { return messages; } }
+            set { lock (locker) { messages = value; } }
+        }
+
         public ChatServer()
         {
             ClientRegistry = new Dictionary<string, ChatConnection>();
             GetIPAddress();
-            Console.WriteLine("Server started...");
+            IsShuttingDown = false;
+            Messages = new List<string>() { "Server started..." };
         }
 
         public void GetIPAddress()
@@ -30,7 +49,7 @@ namespace ChatApplication
             {
                 if (ipHostInfo.AddressList[i].AddressFamily == AddressFamily.InterNetwork)
                 {
-                    Console.WriteLine(ipHostInfo.AddressList[i]);
+                    Messages.Add(ipHostInfo.AddressList[i].ToString());
                 }
             }
         }
@@ -40,8 +59,8 @@ namespace ChatApplication
             IPAddress localAddr = IPAddress.Parse("127.0.0.1");
             var server = new TcpListener(localAddr, port);
             server.Start();
-            Console.WriteLine("Server listening...");
-            while (true)
+            Messages.Add("Server listening...");
+            while (!IsShuttingDown)
             {
                 TcpClient client = await server.AcceptTcpClientAsync();
                 await ProcessClient(client);

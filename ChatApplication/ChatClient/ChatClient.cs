@@ -51,9 +51,9 @@ namespace ChatClient
         public async Task StartClient()
         {
             await Client.ConnectAsync(Address, Port);
+            IsConnected = true;
             var stream = Client.GetStream();
             Writer = new StreamWriter(stream);
-            IsConnected = true;
             using (var reader = new StreamReader(stream))
             {
                 while (true)
