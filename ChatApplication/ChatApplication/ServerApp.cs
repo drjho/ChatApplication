@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ChatApplication
 {
-    class Program
+    class ServerApp
     {
         static void Main(string[] args)
         {

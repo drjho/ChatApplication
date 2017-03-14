@@ -48,24 +48,35 @@ namespace ChatApplication
             }
         }
 
-        public async Task SendMessageAsync(string message, NetworkStream stream)
-        {
-            var buffer = Encoding.ASCII.GetBytes(message + Environment.NewLine);
-            await stream.WriteAsync(buffer, 0, buffer.Length);
-        }
-
         public async Task SendToAllAsync(string message, string sender = "")
         {
             await Task.WhenAll(ClientRegistry.Where(p => p.Key != sender)
-                .Select(p => SendMessageAsync(message, p.Value.GetStream())));
+                .Select(p => p.Value.WriteLineAsync(message)));
         }
 
         public async Task SendToAsync(string sender, string receiver, string message)
         {
             var tmpStr = $"({sender}): {message}";
             await Task.WhenAll(ClientRegistry.Where(p => p.Key == receiver)
-                .Select(p => SendMessageAsync(tmpStr, p.Value.GetStream())));
+                .Select(p => p.Value.WriteLineAsync(message)));
         }
+
+        private bool TryRegisterClient(string name, TcpClient client)
+        {
+            var connection = new ChatConnection(name, client);
+            if (!ClientRegistry.ContainsKey(name))
+            {
+                ClientRegistry[name] = connection;
+                return true;
+            }
+            else
+            {
+                connection.WriteLineAsync($"{name} is taken.");
+                return false;
+            }
+        }
+
+        private string GetClientNamesAsMessage => "/list " + string.Join(" ", ClientRegistry.Keys.ToList());
 
         public async Task ProcessClient(TcpClient client)
         {
@@ -83,20 +94,21 @@ namespace ChatApplication
                     if (message != null)
                     {
                         var lines = message.Split(' ');
-                        var command = lines[0];
-                        if (command.ToLowerInvariant().Equals("/join"))
+                        var command = lines[0].ToLowerInvariant();
+                        if (command.Equals("/join"))
                         {
                             // format /join <name>
                             // TODO: register client, send new client list to all, 
                             //          announce this new client.
                             var evMsg = lines[1] + " joined";
                             Console.WriteLine(evMsg);
-                            ClientRegistry[lines[1]] = new ChatConnection(lines[1], client); // maybe more than just saving the stream.
+                            TryRegisterClient(lines[1], client);
+                            //ClientRegistry[lines[1]] = new ChatConnection(lines[1], client); // maybe more than just saving the stream.
                             // Class that includes, name, reader, writer.
-                            // send new client list! a copy at every client?
+                            await SendToAllAsync(GetClientNamesAsMessage, lines[1]);
                             await SendToAllAsync(evMsg, lines[1]);
                         }
-                        else if (command.ToLowerInvariant().Equals("/disconnect"))
+                        else if (command.Equals("/disconnect"))
                         {
                             // format /disconnect <name>
                             // TODO: unregsiter client, close stream, send new client list to all,
@@ -109,7 +121,7 @@ namespace ChatApplication
                             await SendToAllAsync(evMsg, lines[1]);
                             break;
                         }
-                        else if (command.ToLowerInvariant().Equals("/whisper"))
+                        else if (command.Equals("/whisper"))
                         {
                             // format /whisper <sender> <receiver> <message>
                             // TODO: find receiver in register, if exist send message or return error message.

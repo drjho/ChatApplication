@@ -14,26 +14,17 @@ namespace ChatApplication
 
         public TcpClient Client { get; set; }
 
-        public StreamReader Reader { get; set; }
-
         public StreamWriter Writer { get; set; }
 
         public ChatConnection(string name, TcpClient client)
         {
             Name = name;
             Client = client;
-            NetworkStream stream = client.GetStream();
-            Reader = new StreamReader(stream);
-            Writer = new StreamWriter(stream);
+            Writer = new StreamWriter(client.GetStream());
             Writer.AutoFlush = true;
         }
 
-        public async Task<string> ReadLineAsync()
-        {
-            return await Reader.ReadLineAsync();
-        }
-
-        public async void WriteLineAsync(string message)
+        public async Task WriteLineAsync(string message)
         {
             await Writer.WriteLineAsync(message);
         }
