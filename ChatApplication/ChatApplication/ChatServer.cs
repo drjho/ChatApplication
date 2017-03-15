@@ -8,10 +8,12 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ChatServer
+namespace ChatApplication
 {
     class ChatServer
     {
+        private static int clientNumber = 0;
+
         private Dictionary<string, ChatConnection> ClientRegistry { get; set; } // Use concurrentDictionary instead?
 
         private readonly object locker = new object();
@@ -32,11 +34,14 @@ namespace ChatServer
             set { lock (locker) { messages = value; } }
         }
 
+        private Logger Logger { get; set; }
+
         public ChatServer()
         {
             Messages = new List<string>();
             ClientRegistry = new Dictionary<string, ChatConnection>();
-         
+            Logger = new Logger();
+            Logger.Log(LogLevel.Info, "New log");
         }
 
         public IPAddress GetIPAddress()
@@ -56,126 +61,134 @@ namespace ChatServer
 
         public async Task StartServer(int port)
         {
-            IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+            //IPAddress localAddr = IPAddress.Parse("127.0.0.1");
             var server = new TcpListener(GetIPAddress(), port);
             server.Start();
-            Messages.Add($"Server listening to {server.LocalEndpoint.ToString()}");
+            var msg = $"Server listening to {server.LocalEndpoint.ToString()}";
+            Messages.Add(msg);
+            Logger.Log(LogLevel.Info, msg);
+
             IsShuttingDown = false;
             while (!IsShuttingDown)
             {
                 TcpClient client = await server.AcceptTcpClientAsync();
                 await ProcessClient(client);
             }
+            Logger.CloseLog();
+            server.Stop();
         }
 
         public async Task SendToAllAsync(string message, string sender = "")
         {
             await Task.WhenAll(ClientRegistry.Where(p => p.Key != sender)
-                .Select(p => p.Value.WriteLineAsync(message)));
+                .Select(p => p.Value.WriteMessageAsync(message)));
         }
 
         public async Task SendToAsync(string sender, string receiver, string message)
         {
             var tmpStr = $"({sender}): {message}";
             await Task.WhenAll(ClientRegistry.Where(p => p.Key == receiver)
-                .Select(p => p.Value.WriteLineAsync(message)));
-        }
-
-        private bool TryRegisterClient(string name, TcpClient client)
-        {
-            var connection = new ChatConnection(name, client);
-            if (!ClientRegistry.ContainsKey(name))
-            {
-                ClientRegistry[name] = connection;
-                return true;
-            }
-            else
-            {
-                connection.WriteLineAsync($"{name} is taken.");
-                return false;
-            }
+                .Select(p => p.Value.WriteMessageAsync(message)));
         }
 
         private string GetClientNamesAsMessage => "/list " + string.Join(" ", ClientRegistry.Keys.ToList());
 
-        public async Task ProcessClient(TcpClient client)
+        private async Task ListenToClient(ChatConnection connection)
         {
-            Console.WriteLine(client.Client.RemoteEndPoint.ToString());
-            try
+            string evMsg;
+            while (true)
             {
-                var stream = client.GetStream();
-                var reader = new StreamReader(stream);
-                var writer = new StreamWriter(stream);
-                writer.AutoFlush = true;
-
-                while (true)
+                string message = await connection.ReadMessageAsync();
+                Logger.Log(LogLevel.Info, message);
+                if (message != null)
                 {
-                    string message = await reader.ReadLineAsync();
-                    if (message != null)
+                    var lines = message.Split(' ');
+                    var command = lines[0].ToLowerInvariant();
+                    if (command.Equals("/name"))
                     {
-                        var lines = message.Split(' ');
-                        var command = lines[0].ToLowerInvariant();
-                        if (command.Equals("/join"))
+                        // format /name <new name>
+                        // TODO: register client, send new client list to all, 
+                        //          announce this new client.
+                        if (!ClientRegistry.ContainsKey(lines[1]))
                         {
-                            // format /join <name>
-                            // TODO: register client, send new client list to all, 
-                            //          announce this new client.
-                            var evMsg = lines[1] + " joined";
-                            Console.WriteLine(evMsg);
-                            TryRegisterClient(lines[1], client);
-                            //ClientRegistry[lines[1]] = new ChatConnection(lines[1], client); // maybe more than just saving the stream.
-                            // Class that includes, name, reader, writer.
-                            await SendToAllAsync(GetClientNamesAsMessage, lines[1]);
+                            ClientRegistry.Remove(connection.Name);
+                            connection.Name = lines[1];
+                            ClientRegistry[lines[1]] = connection;
+                            await SendToAllAsync(GetClientNamesAsMessage);
+
+
+                            evMsg = lines[1] + " joined";
+                            Logger.Log(LogLevel.Info, evMsg);
+                            Messages.Add(evMsg);
                             await SendToAllAsync(evMsg, lines[1]);
+
                         }
-                        else if (command.Equals("/disconnect"))
+                    }
+                    else if (command.Equals("/disconnect"))
+                    {
+                        // format /disconnect <name>
+                        // TODO: unregsiter client, close stream, send new client list to all,
+                        //          announce client leave.
+                        evMsg = lines[1] + " is leaving";
+                        Logger.Log(LogLevel.Info, evMsg);
+                        Messages.Add(evMsg);
+
+                        ClientRegistry[lines[1]].CloseConnection();
+                        ClientRegistry.Remove(lines[1]);
+
+                        await SendToAllAsync(GetClientNamesAsMessage);
+                        await SendToAllAsync(evMsg, lines[1]);
+
+                        break;
+                    }
+                    else if (command.Equals("/whisper"))
+                    {
+                        // format /whisper <sender> <receiver> <message>
+                        // TODO: find receiver in register, if exist send message or return error message.
+                        var msg = string.Join(" ", lines.ToList().GetRange(3, lines.Length - 3));
+                        evMsg = $"{lines[1]} -> {lines[2]} : {msg}";
+                        if (ClientRegistry.ContainsKey(lines[2]))
                         {
-                            // format /disconnect <name>
-                            // TODO: unregsiter client, close stream, send new client list to all,
-                            //          announce client leave.
-                            var evMsg = lines[1] + " is leaving";
-                            Console.WriteLine(evMsg);
-                            ClientRegistry[lines[1]].CloseConnection();
-                            ClientRegistry.Remove(lines[1]);
-                            // send new client list!
-                            await SendToAllAsync(evMsg, lines[1]);
-                            break;
-                        }
-                        else if (command.Equals("/whisper"))
-                        {
-                            // format /whisper <sender> <receiver> <message>
-                            // TODO: find receiver in register, if exist send message or return error message.
-                            var evMsg = $"{lines[1]} -> {lines[2]} : {lines[3]}";
-                            if (ClientRegistry.ContainsKey(lines[2]))
-                            {
-                                Console.WriteLine($"success: {evMsg}");
-                                await SendToAsync(lines[1], lines[2], lines[3]);
-                            }
-                            else
-                            {
-                                Console.WriteLine($"error: {evMsg}");
-                                await writer.WriteLineAsync($"{lines[2]} not in chat");
-                                //await SendToAsync("Server", lines[1], $"{lines[2]} not in chat");
-                            }
+                            evMsg = $"success: {evMsg}";
+                            Logger.Log(LogLevel.Info, evMsg);
+                            Messages.Add(evMsg);
+
+                            await SendToAsync(lines[1], lines[2], msg);
                         }
                         else
                         {
-                            // format <sender> <message> 
-                            // TODO: send the message to everyone except sender.
-                            var evMsg = $"{lines[1]} -> all : {lines[2]}";
-                            Console.WriteLine($"success: {evMsg}");
-                            await SendToAllAsync(lines[2], lines[1]);
+                            evMsg = $"error: {evMsg}";
+                            Logger.Log(LogLevel.Info, evMsg);
+                            Messages.Add(evMsg);
+                            await SendToAsync("Server", lines[1], $"{lines[2]} not in chat");
                         }
+                    }
+                    else
+                    {
+                        // format <sender> <message> 
+                        // TODO: send the message to everyone except sender.
+                        evMsg = $"{lines[1]} -> all : {lines[2]}";
+                        evMsg = $"success: {evMsg}";
+                        Logger.Log(LogLevel.Info, evMsg);
+                        Messages.Add(evMsg);
+                        await SendToAllAsync(lines[2], lines[1]);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                if (client.Connected)
-                    client.Close();
+        }
 
-            }
+        public async Task ProcessClient(TcpClient client)
+        {
+            var evMsg = client.Client.RemoteEndPoint.ToString() + " connected.";
+            Logger.Log(LogLevel.Info, evMsg);
+            Messages.Add(evMsg);
+            var name = $"client{clientNumber++}";
+            ClientRegistry[name] = new ChatConnection(name, client);
+            evMsg = name + " joined";
+            Logger.Log(LogLevel.Info, evMsg);
+            Messages.Add(evMsg);
+            Task.Run(() => ListenToClient(ClientRegistry[name]));
+
         }
     }
 }

@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ChatServer
+namespace ChatApplication
 {
     class ChatConnection
     {
@@ -16,15 +16,23 @@ namespace ChatServer
 
         public StreamWriter Writer { get; set; }
 
+        public StreamReader Reader { get; set; }
+
         public ChatConnection(string name, TcpClient client)
         {
             Name = name;
             Client = client;
             Writer = new StreamWriter(client.GetStream());
             Writer.AutoFlush = true;
+            Reader = new StreamReader(client.GetStream());
         }
 
-        public async Task WriteLineAsync(string message)
+        public async Task<string> ReadMessageAsync()
+        {
+            return await Reader.ReadLineAsync();
+        }
+
+        public async Task WriteMessageAsync(string message)
         {
             await Writer.WriteLineAsync(message);
         }

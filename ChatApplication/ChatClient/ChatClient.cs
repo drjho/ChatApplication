@@ -55,6 +55,8 @@ namespace ChatClient
             IsConnected = true;
             var stream = Client.GetStream();
             Writer = new StreamWriter(stream);
+            Writer.AutoFlush = true;
+
             using (var reader = new StreamReader(stream))
             {
                 while (IsConnected)
@@ -79,6 +81,7 @@ namespace ChatClient
                     }
                 }
             }
+            Client.Close();
         }
 
 
