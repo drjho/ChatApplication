@@ -45,6 +45,7 @@ namespace ChatClient
             Address = address;
             Port = port;
             Messages = new List<string>();
+            OtherClients = new HashSet<string>();
             Client = new TcpClient();
         }
 
@@ -56,7 +57,7 @@ namespace ChatClient
             Writer = new StreamWriter(stream);
             using (var reader = new StreamReader(stream))
             {
-                while (true)
+                while (IsConnected)
                 {
                     string response = await reader.ReadLineAsync();
                     var lines = response.Split(' ').ToList();

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ChatApplication
+namespace ChatServer
 {
     class ServerApp
     {
@@ -16,8 +16,6 @@ namespace ChatApplication
             while (true)
             {
                 Console.Clear();
-                if (chatServer.IsShuttingDown)
-                    break;
                 Console.WriteLine("Update server messages by pressing [Enter]");
                 Console.WriteLine("ServerMessage:");
                 foreach (var message in chatServer.Messages)
@@ -27,7 +25,10 @@ namespace ChatApplication
                 Console.WriteLine("----------");
                 Console.Write("> ");
                 if (Console.ReadLine().ToLowerInvariant().Equals("/exit"))
+                {
+                    chatServer.IsShuttingDown = true;
                     break;
+                }
             }
             Console.WriteLine("Server is shut down");
         }

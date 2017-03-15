@@ -8,7 +8,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ChatApplication
+namespace ChatServer
 {
     class ChatServer
     {
@@ -34,13 +34,12 @@ namespace ChatApplication
 
         public ChatServer()
         {
+            Messages = new List<string>();
             ClientRegistry = new Dictionary<string, ChatConnection>();
-            GetIPAddress();
-            IsShuttingDown = false;
-            Messages = new List<string>() { "Server started..." };
+         
         }
 
-        public void GetIPAddress()
+        public IPAddress GetIPAddress()
         {
             string hostName = Dns.GetHostName();
             IPHostEntry ipHostInfo = Dns.GetHostEntry(hostName);
@@ -49,17 +48,19 @@ namespace ChatApplication
             {
                 if (ipHostInfo.AddressList[i].AddressFamily == AddressFamily.InterNetwork)
                 {
-                    Messages.Add(ipHostInfo.AddressList[i].ToString());
+                    return ipHostInfo.AddressList[i];
                 }
             }
+            return null;
         }
 
         public async Task StartServer(int port)
         {
             IPAddress localAddr = IPAddress.Parse("127.0.0.1");
-            var server = new TcpListener(localAddr, port);
+            var server = new TcpListener(GetIPAddress(), port);
             server.Start();
-            Messages.Add("Server listening...");
+            Messages.Add($"Server listening to {server.LocalEndpoint.ToString()}");
+            IsShuttingDown = false;
             while (!IsShuttingDown)
             {
                 TcpClient client = await server.AcceptTcpClientAsync();
