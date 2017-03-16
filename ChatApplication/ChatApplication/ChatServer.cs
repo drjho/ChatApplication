@@ -152,15 +152,30 @@ namespace ChatApplication
             if (command.Equals("/q"))
             {
                 Disconnect(sender);
+                var msg = $"/i {GetUsernamesAsString()}";
+                lock (connections)
+                {
+                    foreach (var connection in connections)
+                    {
+                        connection.BeginWrite(WriteCallback, connection, msg);
+                    }
+                }
             }
             else if (command.Equals("/r"))
             {
                 if (lines.Count == 2)
                 {
                     sender.UserName = lines[1];
-                    var msg = $"{sender.EndPoint} renamed to {sender.UserName}";
-                    ShowAndLog(LogLevel.Info, msg);
-                    SendUsernames();
+                    var evMsg = $"{sender.EndPoint} renamed to {sender.UserName}";
+                    ShowAndLog(LogLevel.Info, evMsg);
+                    var msg = $"/i {GetUsernamesAsString()}";
+                    lock (connections)
+                    {
+                        foreach (var connection in connections)
+                        {
+                            connection.BeginWrite(WriteCallback, connection, evMsg);
+                        }
+                    }
                 }
             }
             else if (command.Equals("/u"))
@@ -173,15 +188,36 @@ namespace ChatApplication
             {
                 if (lines.Count > 2)
                 {
+                    var msg = string.Join(" ", lines.GetRange(2, lines.Count - 2));
                     var receiver = connections.FirstOrDefault(c => c.UserName == lines[1]);
-                    if (receiver != null)
+                    if (receiver != null && sender.UserName != receiver.UserName)
                     {
-                        var msg = string.Join(" ", lines.GetRange(3, lines.Count - 3));
-                        var evMsg = $"{sender.UserName} ask for usernames";
+                        var evMsg = $"{sender.UserName}->{receiver.UserName}:{msg}";
                         ShowAndLog(LogLevel.Info, evMsg);
-                        receiver.BeginWrite(WriteCallback, receiver, msg);
+                        receiver.BeginWrite(WriteCallback, receiver, $"{sender.UserName}:{msg}");
+                        sender.BeginWrite(WriteCallback, sender, $"+ {message}");
+                        return;
                     }
                 }
+                sender.BeginWrite(WriteCallback, sender, $"- {message}");
+
+            }
+            else if (command.Equals("/a"))
+            {
+                if (lines.Count > 1)
+                {
+                    var msg = sender.UserName + ":" + string.Join(" ", lines.GetRange(1, lines.Count - 1));
+                    var evMsg = $"{sender.UserName}->all:{msg}";
+                    ShowAndLog(LogLevel.Info, evMsg);
+                    foreach (var connection in connections)
+                    {
+                        if (connection.UserName != sender.UserName)
+                            connection.BeginWrite(WriteCallback, connection, msg);
+                    }
+                    sender.BeginWrite(WriteCallback, sender, $"+ {message}");
+                    return;
+                }
+                sender.BeginWrite(WriteCallback, sender, $"- {message}");
             }
         }
 
@@ -195,18 +231,6 @@ namespace ChatApplication
 
             var msg = $"{disconnecting.UserName} left";
             ShowAndLog(LogLevel.Info, msg);
-
-
-            SendUsernames();
-        }
-
-        private void SendUsernames()
-        {
-            var msg = $"/i {GetUsernamesAsString()}";
-            foreach (var connection in connections)
-            {
-                connection.BeginWrite(WriteCallback, connection, msg);
-            }
         }
 
         private void WriteCallback(IAsyncResult ar)
@@ -227,7 +251,10 @@ namespace ChatApplication
 
         private string GetUsernamesAsString()
         {
-            return string.Join(";", connections.Select(c => c.UserName));
+            lock (connections)
+            {
+                return string.Join(";", connections.Select(c => c.UserName));
+            }
         }
 
         public void UpdateView()

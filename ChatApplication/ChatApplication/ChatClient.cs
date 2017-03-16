@@ -18,7 +18,7 @@ namespace ChatApplication
 
         private List<string> OtherClients { get; set; }
 
-        private List<string> Messages { get; set; }
+        private readonly List<string> chatMessages;
 
         private ChatConnection Connection { get; set; }
 
@@ -78,7 +78,7 @@ namespace ChatApplication
 
         public ChatClient(IPAddress address, int port, string name)
         {
-            Messages = new List<string>();
+            chatMessages = new List<string>();
             OtherClients = new List<string>();
             ClientName = name;
             var client = new TcpClient();
@@ -137,7 +137,13 @@ namespace ChatApplication
                     UpdateOtherClientNames(names);
                 }
             }
-            UpdateView();
+            else
+            {
+                lock (chatMessages)
+                {
+                    chatMessages.Add(message);
+                }
+            }
         }
 
         public void ParseInput(string input)
@@ -148,9 +154,9 @@ namespace ChatApplication
             {
                 Quit();
             }
-            else if (command.Equals("/u"))
+            else 
             {
-                Connection.BeginWrite(WriteCallback, Connection, "/u");
+                Connection.BeginWrite(WriteCallback, Connection, input);
             }
         }
 
@@ -162,11 +168,11 @@ namespace ChatApplication
 
         public List<string> GetLastTenMessages()
         {
-            lock (Messages)
+            lock (chatMessages)
             {
-                var start = Math.Max(0, Messages.Count - 10);
-                var count = Math.Min(10, Messages.Count);
-                return Messages.GetRange(start, count);
+                var start = Math.Max(0, chatMessages.Count - 10);
+                var count = Math.Min(10, chatMessages.Count);
+                return chatMessages.GetRange(start, count);
             }
         }
 

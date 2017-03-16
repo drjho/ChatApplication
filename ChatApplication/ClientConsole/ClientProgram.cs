@@ -27,7 +27,7 @@ namespace ClientConsole
 
             while (true)
             {
-                Console.Write("> ");
+                //Console.Write("> ");
                 chatClient.ParseInput(Console.ReadLine());
                 Console.Clear();
                 //chatClient.UpdateView();
