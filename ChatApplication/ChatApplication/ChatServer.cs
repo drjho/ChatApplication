@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace ChatApplication
 {
-    class ChatServer
+    public class ChatServer
     {
-        private static int clientNumber = 0;
+        //private static int clientNumber = 0;
 
         private Dictionary<string, ChatConnection> ClientRegistry { get; set; } // Use concurrentDictionary instead?
 
@@ -82,13 +82,13 @@ namespace ChatApplication
             server.BeginAcceptTcpClient(AcceptCallback, server);
         }
 
-        private void AcceptCallback(IAsyncResult result)
+        private void AcceptCallback(IAsyncResult ar)
         {
-            var server = (TcpListener)result.AsyncState;
+            var server = (TcpListener)ar.AsyncState;
             try
             {
-                var client = server.EndAcceptTcpClient(result);
-                var connection = new ChatConnection(client);
+                var client = server.EndAcceptTcpClient(ar);
+                var connection = new ChatConnection(client.Client.RemoteEndPoint.ToString(), client);
                 ClientRegistry[connection.Name] = connection;
 
                 var evMsg = "connection from " + connection.Name;

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ChatApplication
 {
-    class ChatConnection
+    public class ChatConnection
     {
         public string Name { get; set; }
 
@@ -17,11 +17,6 @@ namespace ChatApplication
         public byte[] Buffer { get; set; }
 
         private static int BUFFERSIZE = 1024;
-
-        public ChatConnection(TcpClient client) : this (client.Client.RemoteEndPoint.ToString(), client )
-        {
-
-        }
 
         public ChatConnection(string name, TcpClient client)
         {
@@ -39,14 +34,26 @@ namespace ChatApplication
 
         public void BeginRead(AsyncCallback callback, object state)
         {
-            Client.GetStream().BeginRead(Buffer, 0, BUFFERSIZE, callback, state);
+            if (Client.Connected)
+                Client.GetStream().BeginRead(Buffer, 0, BUFFERSIZE, callback, state);
+        }
+
+        public void BeginWrite(AsyncCallback callback, object state, string message)
+        {
+            if (Client.Connected)
+            {
+                var buffer = Encoding.UTF8.GetBytes(message);
+                Client.GetStream().BeginWrite(buffer, 0, buffer.Length, callback, state);
+            }
         }
 
         public void CloseConnection()
         {
+            Name = null;
+            Buffer = null;
             Client.Close();
         }
- 
+
 
     }
 }

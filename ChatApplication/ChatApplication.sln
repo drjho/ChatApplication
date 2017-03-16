@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatServer", "ChatApplication\ChatServer.csproj", "{F615A93F-7C0B-4941-8578-F7041144ADAF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatApplication", "ChatApplication\ChatApplication.csproj", "{F615A93F-7C0B-4941-8578-F7041144ADAF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatClient", "ChatClient\ChatClient.csproj", "{C0B4467E-150E-4EAE-B8EB-42CAC26B354F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientConsole", "ClientConsole\ClientConsole.csproj", "{AC91C684-6294-4F0D-971A-E75AD54BD316}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerConsole", "ServerConsole\ServerConsole.csproj", "{FF8D7400-2D61-421F-A07C-2F39DCD212DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +19,14 @@ Global
 		{F615A93F-7C0B-4941-8578-F7041144ADAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F615A93F-7C0B-4941-8578-F7041144ADAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F615A93F-7C0B-4941-8578-F7041144ADAF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C0B4467E-150E-4EAE-B8EB-42CAC26B354F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C0B4467E-150E-4EAE-B8EB-42CAC26B354F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C0B4467E-150E-4EAE-B8EB-42CAC26B354F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C0B4467E-150E-4EAE-B8EB-42CAC26B354F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC91C684-6294-4F0D-971A-E75AD54BD316}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC91C684-6294-4F0D-971A-E75AD54BD316}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC91C684-6294-4F0D-971A-E75AD54BD316}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC91C684-6294-4F0D-971A-E75AD54BD316}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF8D7400-2D61-421F-A07C-2F39DCD212DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF8D7400-2D61-421F-A07C-2F39DCD212DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF8D7400-2D61-421F-A07C-2F39DCD212DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF8D7400-2D61-421F-A07C-2F39DCD212DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

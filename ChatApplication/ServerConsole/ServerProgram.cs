@@ -1,12 +1,13 @@
-﻿using System;
+﻿using ChatApplication;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ChatApplication
+namespace ServerConsole
 {
-    public class ServerApp
+    class ServerProgram
     {
         static void Main(string[] args)
         {
