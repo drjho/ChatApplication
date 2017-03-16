@@ -12,24 +12,19 @@ namespace ServerConsole
         static void Main(string[] args)
         {
             var chatServer = new ChatServer();
-            Task.Run(() => chatServer.StartServer(13000));
+            chatServer.StartServer(13000);
+
+            Task.Run(() => chatServer.UpdateView());
 
             while (true)
             {
-                Console.Clear();
-                Console.WriteLine("Update server messages by pressing [Enter]");
-                Console.WriteLine("ServerMessage:");
-                foreach (var message in chatServer.Messages)
-                {
-                    Console.WriteLine(message);
-                }
-                Console.WriteLine("----------");
                 Console.Write("> ");
-                if (Console.ReadLine().ToLowerInvariant().Equals("/exit"))
-                {
-                    chatServer.IsShuttingDown = true;
+                chatServer.ParseInput(Console.ReadLine());
+                Console.Clear();
+                Console.SetCursorPosition(0, 0);
+
+                if (!chatServer.Running)
                     break;
-                }
             }
             Console.WriteLine("Server is shut down");
         }

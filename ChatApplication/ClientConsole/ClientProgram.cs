@@ -23,20 +23,22 @@ namespace ClientConsole
 
             Console.Clear();
 
-            Task.Run(() => chatClient.StartClient());
+            Task.Run(() => chatClient.UpdateView());
 
             while (true)
             {
                 Console.Write("> ");
                 chatClient.ParseInput(Console.ReadLine());
+                Console.Clear();
+                chatClient.UpdateView();
+                Console.SetCursorPosition(0, 0);
+
                 if (!chatClient.Connected)
                     break;
             }
 
             Console.WriteLine("Bye!");
         }
-
-
 
         static ChatClient TryCreateClientWithConnectionString(string connectionString, string name)
         {
@@ -53,7 +55,7 @@ namespace ClientConsole
                 Console.WriteLine("Error with Port: " + lines[1]);
                 return null;
             }
-            return ChatClient.CreateClient(address, port, name);
+            return new ChatClient(address, port, name);
         }
 
         static string AskForName()
@@ -61,6 +63,7 @@ namespace ClientConsole
             string name = "";
             while (string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name))
             {
+                Console.Clear();
                 Console.WriteLine("Please enter your name: ");
                 name = Console.ReadLine();
             }

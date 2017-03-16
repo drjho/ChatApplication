@@ -8,9 +8,11 @@ using System.Threading.Tasks;
 
 namespace ChatApplication
 {
-    public class ChatConnection
+    public class ChatConnection : IEquatable<ChatConnection>
     {
-        public string Name { get; set; }
+        public string EndPoint { get; set; }
+
+        public string UserName { get; set; }
 
         public TcpClient Client { get; set; }
 
@@ -18,9 +20,8 @@ namespace ChatApplication
 
         private static int BUFFERSIZE = 1024;
 
-        public ChatConnection(string name, TcpClient client)
+        public ChatConnection(TcpClient client)
         {
-            Name = name;
             Client = client;
             Buffer = new byte[BUFFERSIZE];
         }
@@ -49,11 +50,15 @@ namespace ChatApplication
 
         public void CloseConnection()
         {
-            Name = null;
-            Buffer = null;
             Client.Close();
         }
 
+        public bool Equals(ChatConnection other)
+        {
+            if (other == null)
+                return false;
 
+            return (this.EndPoint == other.EndPoint);
+        }
     }
 }

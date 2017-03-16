@@ -14,7 +14,7 @@ namespace ChatApplication
     {
         //private static int clientNumber = 0;
 
-        private Dictionary<string, ChatConnection> ClientRegistry { get; set; } // Use concurrentDictionary instead?
+        private readonly List<ChatConnection> connections;
 
         private readonly object locker = new object();
 
@@ -26,22 +26,27 @@ namespace ChatApplication
             set { lock (locker) { isShuttingDown = value; } }
         }
 
-        private List<string> messages;
-
-        public List<string> Messages
-        {
-            get { lock (locker) { return messages; } }
-            set { lock (locker) { messages = value; } }
-        }
+        private readonly List<string> messages;
 
         private Logger Logger { get; set; }
 
+        public bool Running { get; private set; }
+
         public ChatServer()
         {
-            Messages = new List<string>();
-            ClientRegistry = new Dictionary<string, ChatConnection>();
+            messages = new List<string>();
+            connections = new List<ChatConnection>();
             Logger = new Logger();
             Logger.Log(LogLevel.Info, "New log");
+        }
+
+        private void ShowAndLog(LogLevel level, string log)
+        {
+            lock (messages)
+            {
+                messages.Add(log);
+            }
+            Logger.Log(LogLevel.Info, log);
         }
 
         /// <summary>
@@ -73,13 +78,28 @@ namespace ChatApplication
             // Starting the server.
             server.Start();
 
+            Running = true;
+
             // Show and log info
             var msg = $"Server listening to {server.LocalEndpoint.ToString()}";
-            Messages.Add(msg);
-            Logger.Log(LogLevel.Info, msg);
+            ShowAndLog(LogLevel.Info, msg);
 
             // Set server to accept client mode.
             server.BeginAcceptTcpClient(AcceptCallback, server);
+        }
+
+        public void StopServer(string reason)
+        {
+            Running = false;
+            lock (connections)
+            {
+                var msg = $"/q {reason}";
+                foreach (var connection in connections)
+                {
+                    connection.BeginWrite(WriteCallback, connection, msg);
+
+                }
+            }
         }
 
         private void AcceptCallback(IAsyncResult ar)
@@ -88,12 +108,15 @@ namespace ChatApplication
             try
             {
                 var client = server.EndAcceptTcpClient(ar);
-                var connection = new ChatConnection(client.Client.RemoteEndPoint.ToString(), client);
-                ClientRegistry[connection.Name] = connection;
+                var connection = new ChatConnection(client)
+                {
+                    EndPoint = client.Client.RemoteEndPoint.ToString()
+                };
+                connections.Add(connection);
 
-                var evMsg = "connection from " + connection.Name;
-                Logger.Log(LogLevel.Info, evMsg);
-                Messages.Add(evMsg);
+                var evMsg = "connection from " + connection.UserName;
+                ShowAndLog(LogLevel.Info, msg);
+
 
                 connection.BeginRead(ReadCallback, connection);
 
@@ -102,7 +125,6 @@ namespace ChatApplication
             }
             catch (Exception ex)
             {
-
                 Console.WriteLine("In AcceptCallback: " + ex);
             }
         }
@@ -129,9 +151,7 @@ namespace ChatApplication
             }
             catch (Exception ex)
             {
-
                 Console.WriteLine("In ReadCallback: " + ex);
-
             }
         }
 
@@ -141,119 +161,89 @@ namespace ChatApplication
             {
                 Console.WriteLine(message);
             }
+            var lines = message.Split(' ');
+            var command = lines[0].ToLowerInvariant();
+            if (command.Equals("/q"))
+            {
+                Disconnect(connection);
+            }
+            else if (command.Equals("/n"))
+            {
+                connection.UserName = lines[1];
+                var msg = $"{connection.EndPoint} renamed to {connection.UserName}";
+                ShowAndLog(LogLevel.Info, msg);
+            }
         }
 
-        //public async Task SendToAllAsync(string message, string sender = "")
-        //{
-        //    await Task.WhenAll(ClientRegistry.Where(p => p.Key != sender)
-        //        .Select(p => p.Value.WriteMessageAsync(message)));
-        //}
+        private void Disconnect(ChatConnection disconnecting)
+        {
+            lock (connections)
+            {
+                connections.Remove(disconnecting);
+            }
+            disconnecting.CloseConnection();
 
-        //public async Task SendToAsync(string sender, string receiver, string message)
-        //{
-        //    var tmpStr = $"({sender}): {message}";
-        //    await Task.WhenAll(ClientRegistry.Where(p => p.Key == receiver)
-        //        .Select(p => p.Value.WriteMessageAsync(message)));
-        //}
-
-        //private string GetClientNamesAsMessage => "/list " + string.Join(" ", ClientRegistry.Keys.ToList());
-
-        //private async Task ListenToClient(ChatConnection connection)
-        //{
-        //    string evMsg;
-        //    while (true)
-        //    {
-        //        string message = await connection.ReadMessageAsync();
-        //        Logger.Log(LogLevel.Info, message);
-        //        if (message != null)
-        //        {
-        //            var lines = message.Split(' ');
-        //            var command = lines[0].ToLowerInvariant();
-        //            if (command.Equals("/name"))
-        //            {
-        //                // format /name <new name>
-        //                // TODO: register client, send new client list to all, 
-        //                //          announce this new client.
-        //                if (!ClientRegistry.ContainsKey(lines[1]))
-        //                {
-        //                    ClientRegistry.Remove(connection.Name);
-        //                    connection.Name = lines[1];
-        //                    ClientRegistry[lines[1]] = connection;
-        //                    await SendToAllAsync(GetClientNamesAsMessage);
+            var msg = $"{disconnecting.UserName} left";
+            ShowAndLog(LogLevel.Info, msg);
 
 
-        //                    evMsg = lines[1] + " joined";
-        //                    Logger.Log(LogLevel.Info, evMsg);
-        //                    Messages.Add(evMsg);
-        //                    await SendToAllAsync(evMsg, lines[1]);
+            SendUsernames();
+        }
 
-        //                }
-        //            }
-        //            else if (command.Equals("/disconnect"))
-        //            {
-        //                // format /disconnect <name>
-        //                // TODO: unregsiter client, close stream, send new client list to all,
-        //                //          announce client leave.
-        //                evMsg = lines[1] + " is leaving";
-        //                Logger.Log(LogLevel.Info, evMsg);
-        //                Messages.Add(evMsg);
+        private void SendUsernames()
+        {
+            var msg = $"/i {GetUsernamesAsString()}";
+            foreach (var connection in connections)
+            {
+                connection.BeginWrite(WriteCallback, connection, msg);
+            }
+        }
 
-        //                ClientRegistry[lines[1]].CloseConnection();
-        //                ClientRegistry.Remove(lines[1]);
+        private void WriteCallback(IAsyncResult ar)
+        {
+            try
+            {
+                var connection = (ChatConnection)ar.AsyncState;
+                if (connection.Client.Connected)
+                {
+                    connection.Client.GetStream().EndWrite(ar);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("In ReadCallback: " + ex);
+            }
+        }
 
-        //                await SendToAllAsync(GetClientNamesAsMessage);
-        //                await SendToAllAsync(evMsg, lines[1]);
+        private string GetUsernamesAsString()
+        {
+            return string.Join(";", connections.Select(c => c.UserName));
+        }
 
-        //                break;
-        //            }
-        //            else if (command.Equals("/whisper"))
-        //            {
-        //                // format /whisper <sender> <receiver> <message>
-        //                // TODO: find receiver in register, if exist send message or return error message.
-        //                var msg = string.Join(" ", lines.ToList().GetRange(3, lines.Length - 3));
-        //                evMsg = $"{lines[1]} -> {lines[2]} : {msg}";
-        //                if (ClientRegistry.ContainsKey(lines[2]))
-        //                {
-        //                    evMsg = $"success: {evMsg}";
-        //                    Logger.Log(LogLevel.Info, evMsg);
-        //                    Messages.Add(evMsg);
+        public void UpdateView()
+        {
+            var left = Console.CursorLeft;
+            var top = Console.CursorTop;
+            Console.SetCursorPosition(0, 3);
+            Console.WriteLine("ServerMessage:");
+            foreach (var message in messages)
+            {
+                Console.WriteLine(message);
+            }
+            Console.WriteLine("----------");
+            Console.SetCursorPosition(left, top);
 
-        //                    await SendToAsync(lines[1], lines[2], msg);
-        //                }
-        //                else
-        //                {
-        //                    evMsg = $"error: {evMsg}";
-        //                    Logger.Log(LogLevel.Info, evMsg);
-        //                    Messages.Add(evMsg);
-        //                    await SendToAsync("Server", lines[1], $"{lines[2]} not in chat");
-        //                }
-        //            }
-        //            else
-        //            {
-        //                // format <sender> <message> 
-        //                // TODO: send the message to everyone except sender.
-        //                evMsg = $"{lines[1]} -> all : {lines[2]}";
-        //                evMsg = $"success: {evMsg}";
-        //                Logger.Log(LogLevel.Info, evMsg);
-        //                Messages.Add(evMsg);
-        //                await SendToAllAsync(lines[2], lines[1]);
-        //            }
-        //        }
-        //    }
-        //}
+        }
 
-        //public async Task ProcessClient(TcpClient client)
-        //{
-        //    var evMsg = client.Client.RemoteEndPoint.ToString() + " connected.";
-        //    Logger.Log(LogLevel.Info, evMsg);
-        //    Messages.Add(evMsg);
-        //    var name = $"client{clientNumber++}";
-        //    ClientRegistry[name] = new ChatConnection(name, client);
-        //    evMsg = name + " joined";
-        //    Logger.Log(LogLevel.Info, evMsg);
-        //    Messages.Add(evMsg);
-        //    Task.Run(() => ListenToClient(ClientRegistry[name]));
+        public void ParseInput(string input)
+        {
+            var lines = input.Split(' ');
+            var command = lines[0].ToLowerInvariant();
+            if (command.Equals("/q"))
+            {
+                StopServer("Admin is shutting down the server.");
+            }
+        }
 
-        //}
     }
 }
