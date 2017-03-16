@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ChatApplication
@@ -15,7 +16,7 @@ namespace ChatApplication
 
         public string ClientName { get; set; }
 
-        private HashSet<string> OtherClients { get; set; }
+        private List<string> OtherClients { get; set; }
 
         private List<string> Messages { get; set; }
 
@@ -36,7 +37,7 @@ namespace ChatApplication
                     var message = connection.ReadBufferAndReset(length);
 
                     // Parse the message from client.
-                    ParseMessage(message, connection);
+                    ParseMessage(message);
 
                     // Update the view of the chat.
                     UpdateView();
@@ -56,11 +57,14 @@ namespace ChatApplication
             var left = Console.CursorLeft;
             var top = Console.CursorTop;
             Console.SetCursorPosition(0, 3);
-            Console.WriteLine("Update chatter list by pressing [Enter]");
+            
             Console.WriteLine("Chatters:");
-            foreach (var clientName in GetOtherClientNames())
+            lock (OtherClients)
             {
-                Console.WriteLine(clientName);
+                foreach (var clientName in OtherClients)
+                {
+                    Console.WriteLine(clientName);
+                }
             }
             Console.WriteLine("----------");
             Console.WriteLine("ServerMessage:");
@@ -75,7 +79,7 @@ namespace ChatApplication
         public ChatClient(IPAddress address, int port, string name)
         {
             Messages = new List<string>();
-            OtherClients = new HashSet<string>();
+            OtherClients = new List<string>();
             ClientName = name;
             var client = new TcpClient();
             client.BeginConnect(address, port, ConnectCallback, client);
@@ -89,7 +93,10 @@ namespace ChatApplication
                 client.EndConnect(ar);
                 Connection = new ChatConnection(client) { UserName = ClientName };
                 Connection.BeginRead(ReadCallback, Connection);
-                Connection.BeginWrite(WriteCallback, Connection, $"/n {ClientName}");
+
+                Connection.BeginWrite(WriteCallback, Connection, $"/r {ClientName}");
+
+
             }
             catch (Exception ex)
             {
@@ -113,18 +120,24 @@ namespace ChatApplication
             }
         }
 
-        private void ParseMessage(string message, ChatConnection connection)
+        private void ParseMessage(string message)
         {
-            if (!string.IsNullOrEmpty(message))
-            {
-                Console.WriteLine(message);
-            }
             var lines = message.Split(' ');
             var command = lines[0].ToLowerInvariant();
             if (command.Equals("/q"))
             {
                 Connection.CloseConnection();
             }
+            else if (command.Equals("/i"))
+            {
+                if (lines.Length == 2)
+                {
+                    //Console.WriteLine(lines[1]);
+                    var names = lines[1].Split(';');
+                    UpdateOtherClientNames(names);
+                }
+            }
+            UpdateView();
         }
 
         public void ParseInput(string input)
@@ -134,6 +147,10 @@ namespace ChatApplication
             if (command.Equals("/q"))
             {
                 Quit();
+            }
+            else if (command.Equals("/u"))
+            {
+                Connection.BeginWrite(WriteCallback, Connection, "/u");
             }
         }
 
@@ -157,15 +174,7 @@ namespace ChatApplication
         {
             lock (OtherClients)
             {
-                OtherClients = new HashSet<string>(clients);
-            }
-        }
-
-        public List<string> GetOtherClientNames()
-        {
-            lock (OtherClients)
-            {
-                return OtherClients.ToList();
+                OtherClients = clients.ToList();
             }
         }
     }

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ClientConsole
 {
-    class ClientProgram
+    public class ClientProgram
     {
         static void Main(string[] args)
         {
@@ -23,14 +23,14 @@ namespace ClientConsole
 
             Console.Clear();
 
-            Task.Run(() => chatClient.UpdateView());
+            chatClient.UpdateView();
 
             while (true)
             {
                 Console.Write("> ");
                 chatClient.ParseInput(Console.ReadLine());
                 Console.Clear();
-                chatClient.UpdateView();
+                //chatClient.UpdateView();
                 Console.SetCursorPosition(0, 0);
 
                 if (!chatClient.Connected)
@@ -43,6 +43,8 @@ namespace ClientConsole
         static ChatClient TryCreateClientWithConnectionString(string connectionString, string name)
         {
             var lines = connectionString.Split(':');
+            if (lines.Length != 2)
+                return null;
             IPAddress address;
             int port = 0;
             if (!IPAddress.TryParse(lines[0], out address))

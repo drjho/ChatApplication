@@ -12,19 +12,7 @@ namespace ChatApplication
 {
     public class ChatServer
     {
-        //private static int clientNumber = 0;
-
         private readonly List<ChatConnection> connections;
-
-        private readonly object locker = new object();
-
-        private bool isShuttingDown;
-
-        public bool IsShuttingDown
-        {
-            get { lock (locker) { return isShuttingDown; } }
-            set { lock (locker) { isShuttingDown = value; } }
-        }
 
         private readonly List<string> messages;
 
@@ -114,9 +102,8 @@ namespace ChatApplication
                 };
                 connections.Add(connection);
 
-                var evMsg = "connection from " + connection.UserName;
-                ShowAndLog(LogLevel.Info, msg);
-
+                var evMsg = "connection from " + connection.EndPoint;
+                ShowAndLog(LogLevel.Info, evMsg);
 
                 connection.BeginRead(ReadCallback, connection);
 
@@ -145,6 +132,9 @@ namespace ChatApplication
                     // Parse the message from client.
                     ParseMessage(message, connection);
 
+                    // Update the view of the server.
+                    UpdateView();
+
                     // Back to read mode.
                     connection.BeginRead(ReadCallback, connection);
                 }
@@ -155,23 +145,43 @@ namespace ChatApplication
             }
         }
 
-        private void ParseMessage(string message, ChatConnection connection)
+        private void ParseMessage(string message, ChatConnection sender)
         {
-            if (!string.IsNullOrEmpty(message))
-            {
-                Console.WriteLine(message);
-            }
-            var lines = message.Split(' ');
+            var lines = message.Split(' ').ToList();
             var command = lines[0].ToLowerInvariant();
             if (command.Equals("/q"))
             {
-                Disconnect(connection);
+                Disconnect(sender);
             }
-            else if (command.Equals("/n"))
+            else if (command.Equals("/r"))
             {
-                connection.UserName = lines[1];
-                var msg = $"{connection.EndPoint} renamed to {connection.UserName}";
+                if (lines.Count == 2)
+                {
+                    sender.UserName = lines[1];
+                    var msg = $"{sender.EndPoint} renamed to {sender.UserName}";
+                    ShowAndLog(LogLevel.Info, msg);
+                    SendUsernames();
+                }
+            }
+            else if (command.Equals("/u"))
+            {
+                var msg = $"{sender.UserName} ask for usernames";
                 ShowAndLog(LogLevel.Info, msg);
+                sender.BeginWrite(WriteCallback, sender, $"/i {GetUsernamesAsString()}");
+            }
+            else if (command.Equals("/w"))
+            {
+                if (lines.Count > 2)
+                {
+                    var receiver = connections.FirstOrDefault(c => c.UserName == lines[1]);
+                    if (receiver != null)
+                    {
+                        var msg = string.Join(" ", lines.GetRange(3, lines.Count - 3));
+                        var evMsg = $"{sender.UserName} ask for usernames";
+                        ShowAndLog(LogLevel.Info, evMsg);
+                        receiver.BeginWrite(WriteCallback, receiver, msg);
+                    }
+                }
             }
         }
 
@@ -226,9 +236,12 @@ namespace ChatApplication
             var top = Console.CursorTop;
             Console.SetCursorPosition(0, 3);
             Console.WriteLine("ServerMessage:");
-            foreach (var message in messages)
+            lock (messages)
             {
-                Console.WriteLine(message);
+                foreach (var message in messages)
+                {
+                    Console.WriteLine(message);
+                }
             }
             Console.WriteLine("----------");
             Console.SetCursorPosition(left, top);

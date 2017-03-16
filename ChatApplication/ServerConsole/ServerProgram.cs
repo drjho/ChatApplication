@@ -14,6 +14,8 @@ namespace ServerConsole
             var chatServer = new ChatServer();
             chatServer.StartServer(13000);
 
+            Console.Clear();
+
             Task.Run(() => chatServer.UpdateView());
 
             while (true)
@@ -21,11 +23,13 @@ namespace ServerConsole
                 Console.Write("> ");
                 chatServer.ParseInput(Console.ReadLine());
                 Console.Clear();
+                chatServer.UpdateView();
                 Console.SetCursorPosition(0, 0);
 
                 if (!chatServer.Running)
                     break;
             }
+
             Console.WriteLine("Server is shut down");
         }
     }
