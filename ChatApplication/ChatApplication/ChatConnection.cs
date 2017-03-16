@@ -14,27 +14,32 @@ namespace ChatApplication
 
         public TcpClient Client { get; set; }
 
-        public StreamWriter Writer { get; set; }
+        public byte[] Buffer { get; set; }
 
-        public StreamReader Reader { get; set; }
+        private static int BUFFERSIZE = 1024;
+
+        public ChatConnection(TcpClient client) : this (client.Client.RemoteEndPoint.ToString(), client )
+        {
+
+        }
 
         public ChatConnection(string name, TcpClient client)
         {
             Name = name;
             Client = client;
-            Writer = new StreamWriter(client.GetStream());
-            Writer.AutoFlush = true;
-            Reader = new StreamReader(client.GetStream());
+            Buffer = new byte[BUFFERSIZE];
         }
 
-        public async Task<string> ReadMessageAsync()
+        public string ReadBufferAndReset(int length)
         {
-            return await Reader.ReadLineAsync();
+            var message = Encoding.UTF8.GetString(Buffer, 0, length).Trim();
+            Array.Clear(Buffer, 0, length);
+            return message;
         }
 
-        public async Task WriteMessageAsync(string message)
+        public void BeginRead(AsyncCallback callback, object state)
         {
-            await Writer.WriteLineAsync(message);
+            Client.GetStream().BeginRead(Buffer, 0, BUFFERSIZE, callback, state);
         }
 
         public void CloseConnection()
