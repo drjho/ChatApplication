@@ -21,7 +21,7 @@ namespace ServerConsole
             Console.Clear();
 
             // Show possible event messages.
-            chatServer.UpdateView());
+            chatServer.UpdateView();
 
             // Loop to receive admin inputs (commands).
             while (true)
