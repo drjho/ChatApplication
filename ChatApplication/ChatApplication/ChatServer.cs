@@ -20,6 +20,9 @@ namespace ChatApplication
 
         public bool Running { get; private set; }
 
+        /// <summary>
+        /// Constructor 
+        /// </summary>
         public ChatServer()
         {
             messages = new List<string>();
@@ -28,6 +31,12 @@ namespace ChatApplication
             Logger.Log(LogLevel.Info, "New log");
         }
 
+        /// <summary>
+        /// Add a message to the history for future show
+        /// Also log the message to file.
+        /// </summary>
+        /// <param name="level"></param>
+        /// <param name="log"></param>
         private void ShowAndLog(LogLevel level, string log)
         {
             lock (messages)
@@ -56,6 +65,12 @@ namespace ChatApplication
             return null;
         }
 
+        /// <summary>
+        /// The server is a tcpListener which initiate with local IP and provided port.
+        /// The EndPoint of the server is shown for manual read.
+        /// Finally, the server start accepting incoming connection request.
+        /// </summary>
+        /// <param name="port"></param>
         public void StartServer(int port)
         {
             //IPAddress localAddr = IPAddress.Parse("127.0.0.1");
@@ -76,6 +91,12 @@ namespace ChatApplication
             server.BeginAcceptTcpClient(AcceptCallback, server);
         }
 
+        /// <summary>
+        /// Stopping the server and the loop of the server program for admin input.
+        /// Tell the users to disconnect from the current server.
+        /// Then close down the logger.
+        /// </summary>
+        /// <param name="reason"></param>
         public void StopServer(string reason)
         {
             Running = false;
@@ -88,8 +109,15 @@ namespace ChatApplication
 
                 }
             }
+            Logger.CloseLog();
         }
 
+        /// <summary>
+        /// When a tcpClient is accepted, we set up a new ChatConnection
+        /// and use that for stream read/ write. The ChatConnection is then set to start listening to.
+        /// At the end, the server is set to accept further tcpClient.
+        /// </summary>
+        /// <param name="ar"></param>
         private void AcceptCallback(IAsyncResult ar)
         {
             var server = (TcpListener)ar.AsyncState;
@@ -116,6 +144,13 @@ namespace ChatApplication
             }
         }
 
+        /// <summary>
+        /// When a message is read, it will signal the end of read.
+        /// Get the message from the buffer in the ChatConnection.
+        /// Parse the message and update the view, showing event messages
+        /// Set it to listen again at the end.
+        /// </summary>
+        /// <param name="ar"></param>
         private void ReadCallback(IAsyncResult ar)
         {
             try
@@ -145,6 +180,15 @@ namespace ChatApplication
             }
         }
 
+        /// <summary>
+        /// Can handle disconnect of client ("/q"),
+        /// can handle rename of user name ("/r"),
+        /// can handle user names request ("/u"),
+        /// can handle whisper from one user to another ("/w"), and
+        /// can handle send message to all ("/a").
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="sender"></param>
         private void ParseMessage(string message, ChatConnection sender)
         {
             var lines = message.Split(' ').ToList();
@@ -206,9 +250,10 @@ namespace ChatApplication
             {
                 if (lines.Count > 1)
                 {
-                    var msg = sender.UserName + ":" + string.Join(" ", lines.GetRange(1, lines.Count - 1));
+                    var msg = string.Join(" ", lines.GetRange(1, lines.Count - 1));
                     var evMsg = $"{sender.UserName}->all:{msg}";
                     ShowAndLog(LogLevel.Info, evMsg);
+                    msg = sender.UserName + ":" + string.Join(" ", lines.GetRange(1, lines.Count - 1));
                     foreach (var connection in connections)
                     {
                         if (connection.UserName != sender.UserName)
@@ -221,6 +266,11 @@ namespace ChatApplication
             }
         }
 
+        /// <summary>
+        /// Disconnecting a certain connection when the associated client (user) is leaving.
+        /// This event is logged.
+        /// </summary>
+        /// <param name="disconnecting"></param>
         private void Disconnect(ChatConnection disconnecting)
         {
             lock (connections)
@@ -233,6 +283,10 @@ namespace ChatApplication
             ShowAndLog(LogLevel.Info, msg);
         }
 
+        /// <summary>
+        /// Just signal end of write when writing to a client (user) is done.
+        /// </summary>
+        /// <param name="ar"></param>
         private void WriteCallback(IAsyncResult ar)
         {
             try
@@ -249,6 +303,10 @@ namespace ChatApplication
             }
         }
 
+        /// <summary>
+        /// Format the users' names to a single string for sending thru stream.
+        /// </summary>
+        /// <returns></returns>
         private string GetUsernamesAsString()
         {
             lock (connections)
@@ -257,6 +315,9 @@ namespace ChatApplication
             }
         }
 
+        /// <summary>
+        /// Showing the stored event messages in the server.
+        /// </summary>
         public void UpdateView()
         {
             var left = Console.CursorLeft;
@@ -275,6 +336,10 @@ namespace ChatApplication
 
         }
 
+        /// <summary>
+        /// Parsing input from admin, (at the moment, just for shutting down the server).
+        /// </summary>
+        /// <param name="input"></param>
         public void ParseInput(string input)
         {
             var lines = input.Split(' ');

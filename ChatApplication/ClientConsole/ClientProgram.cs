@@ -12,7 +12,11 @@ namespace ClientConsole
     {
         static void Main(string[] args)
         {
+            // Ask for user name first.
             var name = AskForName();
+
+            // The while-loop is not very effective right now,
+            // it was supposed to be used for reconnecting to a server. 
             ChatClient chatClient = null;
             do
             {
@@ -21,10 +25,13 @@ namespace ClientConsole
                 chatClient = TryCreateClientWithConnectionString(connectionString, name);
             } while (chatClient == null);
 
+            // Clear the screen for view update.
             Console.Clear();
 
+            // Show the list of other connected users and received messages.
             chatClient.UpdateView();
 
+            // Loop for user inputs (commands).
             while (true)
             {
                 //Console.Write("> ");
@@ -33,13 +40,21 @@ namespace ClientConsole
                 //chatClient.UpdateView();
                 Console.SetCursorPosition(0, 0);
 
+                // If the client (user) is not connected then break this loop.
                 if (!chatClient.Connected)
                     break;
             }
 
+            // Final message to the user.
             Console.WriteLine("Bye!");
         }
 
+        /// <summary>
+        /// Check if the connectionString is correct and return a new instance of chat client.
+        /// </summary>
+        /// <param name="connectionString"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
         static ChatClient TryCreateClientWithConnectionString(string connectionString, string name)
         {
             var lines = connectionString.Split(':');
@@ -60,6 +75,10 @@ namespace ClientConsole
             return new ChatClient(address, port, name);
         }
 
+        /// <summary>
+        /// The user has to provide a name.
+        /// </summary>
+        /// <returns></returns>
         static string AskForName()
         {
             string name = "";

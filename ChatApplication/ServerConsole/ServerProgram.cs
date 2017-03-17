@@ -11,13 +11,19 @@ namespace ServerConsole
     {
         static void Main(string[] args)
         {
+            // Instantiate a new chat server.
             var chatServer = new ChatServer();
+
+            // Start the server on port 13000.
             chatServer.StartServer(13000);
 
+            // Clear the screen.
             Console.Clear();
 
-            Task.Run(() => chatServer.UpdateView());
+            // Show possible event messages.
+            chatServer.UpdateView());
 
+            // Loop to receive admin inputs (commands).
             while (true)
             {
                 Console.Write("> ");
@@ -26,10 +32,12 @@ namespace ServerConsole
                 chatServer.UpdateView();
                 Console.SetCursorPosition(0, 0);
 
+                // If the server is not running, then break this loop.
                 if (!chatServer.Running)
                     break;
             }
 
+            // Final message to the admin.
             Console.WriteLine("Server is shut down");
         }
     }
